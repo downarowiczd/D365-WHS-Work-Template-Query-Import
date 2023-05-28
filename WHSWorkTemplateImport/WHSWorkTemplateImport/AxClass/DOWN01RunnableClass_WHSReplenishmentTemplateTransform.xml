@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>DOWN01RunnableClass_WHSReplenishmentTemplateTransform</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+internal final class DOWN01RunnableClass_WHSReplenishmentTemplateTransform
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>main</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Class entry point. The system will call this method when a designated menu
+    /// is selected or when execution starts and this class is set as the startup class.
+    /// </summary>
+    /// <param name = "_args">The specified arguments.</param>
+    /// Dominik Downarowicz - down1 - 8th May 2023
+    public static void main(Args _args)
+    {
+        WHSReplenishmentTemplateLine ltabWHSReplenishmentTemplateLine;
+        QueryRun    lclsQueryRun;
+        Query       lclsQuery;
+        QueryBuildDataSource lclsQueryBuildDataSource,lclsQueryBuildDataSourceDim;
+        container   lconItemInfo;
+        int         lintCounter = 0;
+        ;
+
+        while select forupdate ltabWHSReplenishmentTemplateLine
+        {
+
+            //Differnece between Product and ProductVariant for BaseQuery
+            if(ltabWHSReplenishmentTemplateLine.ProductQueryMode == WHSProductQueryMode::Item)
+            {
+                if (ltabWHSReplenishmentTemplateLine.ReplenFixedOnly)
+                {
+                    lclsQuery = new Query(queryStr(WHSInventTableFixedLoc));
+                }
+                else
+                {
+                    lclsQuery = new Query(queryStr(WHSInventTable));
+                }
+            }
+            else if(ltabWHSReplenishmentTemplateLine.ProductQueryMode == WHSProductQueryMode::Variant)
+            {
+                if (ltabWHSReplenishmentTemplateLine.ReplenFixedOnly)
+                {
+                    lclsQuery = new Query(queryStr(WHSReleasedProductVariantsFixedLoc));
+                }
+                else
+                {
+                    lclsQuery = new Query(queryStr(WHSReleasedProductVariants));
+                }
+            }
+
+            if(ltabWHSReplenishmentTemplateLine.ProductQueryMode == WHSProductQueryMode::Item)
+            {
+                lclsQueryBuildDataSource = lclsQuery.dataSourceTable(tableNum(InventTable));
+                lclsQueryBuildDataSource.addRange(fieldNum(InventTable, ItemId)).value(ltabWHSReplenishmentTemplateLine.Description);
+            }
+            else if(ltabWHSReplenishmentTemplateLine.ProductQueryMode == WHSProductQueryMode::Variant)
+            {
+
+                //Split Description Line (ITEMID|SIZEID)
+                if(strContains(ltabWHSReplenishmentTemplateLine.Description, '|'))
+                {
+
+                    lconItemInfo = str2con_RU(ltabWHSReplenishmentTemplateLine.Description, '|');
+
+
+                    lclsQueryBuildDataSource = lclsQuery.dataSourceTable(tableNum(InventDimCombination));
+
+                    lclsQueryBuildDataSource.addRange(fieldNum(InventDimCombination, ItemId)).value(conPeek(lconItemInfo, 1));
+                    
+                    lclsQueryBuildDataSourceDim = lclsQueryBuildDataSource.addDataSource(tableNum(InventDim));
+                    lclsQueryBuildDataSourceDim.relations(true);
+                    lclsQueryBuildDataSourceDim.joinMode(JoinMode::ExistsJoin);
+                    lclsQueryBuildDataSourceDim.addRange(fieldNum(InventDim, InventSizeId)).value(queryValue(conPeek(lconItemInfo, 2)));
+
+                }
+                else
+                {
+                    warning(strFmt("The Replenishment Template Line with the description %1 has an incorrect description", ltabWHSReplenishmentTemplateLine.Description));
+                }
+
+            }
+
+
+            lclsQueryRun = new QueryRun(lclsQuery);
+            
+
+            //Differnece between Product and ProductVariant for QueryName
+            if(ltabWHSReplenishmentTemplateLine.ProductQueryMode == WHSProductQueryMode::Item)
+            {
+                if (ltabWHSReplenishmentTemplateLine.ReplenFixedOnly)
+                {
+                    lclsQueryRun.name("@WAX:ProductQueryFixedLocations");
+                }
+                else
+                {
+                    lclsQueryRun.name("@SYP4980032");
+                }
+            }
+            else if(ltabWHSReplenishmentTemplateLine.ProductQueryMode == WHSProductQueryMode::Variant)
+            {
+                if (ltabWHSReplenishmentTemplateLine.ReplenFixedOnly)
+                {
+                    lclsQueryRun.name("@WAX:ProductVariantQueryFixedLocations");
+                }
+                else
+                {
+                    lclsQueryRun.name("@SYP4980030");
+                }
+            }
+            
+            lclsQueryRun.saveUserSetup(false);
+
+            ttsbegin;
+
+            if(ltabWHSReplenishmentTemplateLine.ProductQueryMode == WHSProductQueryMode::Item)
+            {
+                ltabWHSReplenishmentTemplateLine.ItemQuery = lclsQueryRun.pack();
+            }
+            else if(ltabWHSReplenishmentTemplateLine.ProductQueryMode == WHSProductQueryMode::Variant)
+            {
+                ltabWHSReplenishmentTemplateLine.ProductVariantQuery = lclsQueryRun.pack();
+            }
+            ltabWHSReplenishmentTemplateLine.update();
+            lintCounter++;
+            ttscommit;
+        }
+    
+        info(strfmt("Completed: Processed %1 Replenishment Template Lines", lintCounter));
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

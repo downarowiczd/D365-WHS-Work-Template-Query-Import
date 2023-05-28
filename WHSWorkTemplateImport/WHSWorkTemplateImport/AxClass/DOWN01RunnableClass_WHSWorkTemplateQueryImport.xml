@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>DOWN01RunnableClass_WHSWorkTemplateQueryImport</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+internal final class DOWN01RunnableClass_WHSWorkTemplateQueryImport
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>main</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Class entry point. The system will call this method when a designated menu
+    /// is selected or when execution starts and this class is set as the startup class.
+    /// </summary>
+    /// <param name = "_args">The specified arguments.</param>
+    /// 8th May 2023 - Dominik Downarowicz - down1
+    public static void main(Args _args)
+    {
+        str lstrQueryData = "";
+        WHSWorkTemplateTable ltabWHSWorkTemplateTable;
+        Connection      lclsConnection;
+        Statement       lclsStatement;
+        str             lstrQuery;
+
+        Dialog      lclsDialog;
+        AsciiStreamIo lclsFile;
+        Array       lclsFileLines;
+        FileUploadTemporaryStorageResult    lclsFileUpload;
+
+        container   lconRecord;
+
+
+        ;
+
+
+        lclsFileUpload = File::GetFileFromUser() as FileUploadTemporaryStorageResult;
+
+        lclsFile = AsciiStreamIo::constructForRead(lclsFileUpload.openResult());
+
+        if(lclsFile)
+        {
+            if(lclsFile.status())
+            {
+                throw error("@SYS52680");
+            }
+            lclsFile.inFieldDelimiter(";");
+        }
+
+        //Erste Zeile auslassen
+        lconRecord = lclsFile.read();
+
+        while(!lclsFile.status())
+        {
+            lconRecord = lclsFile.read();
+            ltabWHSWorkTemplateTable = null;
+
+            if(conLen(lconRecord) && conPeek(lconRecord, 1) && conPeek(lconRecord, 2) && conPeek(lconRecord, 3))
+            {
+                //Suche nach WorkTemplate
+                ltabWHSWorkTemplateTable = WHSWorkTemplateTable::find(conPeek(lconRecord, 1), conPeek(lconRecord, 2), true);
+                if(ltabWHSWorkTemplateTable)
+                {
+                    lstrQueryData = conPeek(lconRecord, 3);
+                    ttsbegin;
+
+                    lstrQuery = "UPDATE WHSWorkTemplateTable SET WorkTemplateQuery = CONVERT(VARBINARY(MAX),'%1',1) WHERE RECID = '%2'";
+                    //lstrQuery = "declare @str varchar(max) = '%1'; UPDATE WHSWorkTemplateTable SET WorkTemplateQuery = cast(N'' as xml).value('xs:base64Binary(sql:variable("@str"))', 'varbinary(max)') WHERE WorkTemplateCode = '%2' "
+
+                    lclsConnection = new Connection();
+
+                    lclsStatement = lclsConnection.createStatement();
+
+                    lstrQuery = strFmt(lstrQuery, lstrQueryData, ltabWHSWorkTemplateTable.RecId);
+            
+                    new SqlStatementExecutePermission(lstrQuery).assert();
+
+                    lclsStatement.executeUpdate(lstrQuery);
+
+                    CodeAccessPermission::revertAssert();
+            
+                    ltabWHSWorkTemplateTable.update();
+
+                    ttscommit;
+                }
+            }
+
+        }
+        Info("Finished");
+        /*
+        while select forupdate ltabWHSWorkTemplateTable where ltabWHSWorkTemplateTable.WorkTemplateCode == 'A Liefrück'
+        {
+
+            ttsbegin;
+            
+            lstrQuery = "UPDATE WHSWorkTemplateTable SET WorkTemplateQuery = CONVERT(VARBINARY(MAX),'%1',1) WHERE WorkTemplateCode = '%2'";
+            //lstrQuery = "declare @str varchar(max) = '%1'; UPDATE WHSWorkTemplateTable SET WorkTemplateQuery = cast(N'' as xml).value('xs:base64Binary(sql:variable("@str"))', 'varbinary(max)') WHERE WorkTemplateCode = '%2' "
+
+            // create connection object
+            lclsConnection = new Connection();
+
+            // create statement
+            lclsStatement = lclsConnection.createStatement();
+
+            // Set the SQL statement
+            lstrQuery = strFmt(lstrQuery, lstrQueryData, ltabWHSWorkTemplateTable.WorkTemplateCode);
+            
+            // assert SQL statement execute permission
+            new SqlStatementExecutePermission(lstrQuery).assert();
+
+            //BP Deviation documented
+            lclsStatement.executeUpdate(lstrQuery);
+
+            // limit the scope of the assert call
+            CodeAccessPermission::revertAssert();
+            
+
+            ltabWHSWorkTemplateTable.update();
+
+            ttscommit;
+        }
+
+    */
+
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>
